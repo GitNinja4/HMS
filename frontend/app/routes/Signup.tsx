@@ -26,7 +26,7 @@ const signupSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string().min(8, "Please confirm your password"),
   organization: z.string().min(2, "Organization name is required"),
-  role: z.enum(["admin", "doctor", "nurse"], {
+  role: z.enum(["admin", "doctor", "nurse", "patient"], {
     errorMap: () => ({ message: "Please select a role" }),
   }),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -194,6 +194,7 @@ const Signup = () => {
                 <option value="doctor">Doctor</option>
                 <option value="nurse">Nurse</option>
                 <option value="admin">Administrator</option>
+                <option value="patient">Patient</option>
               </select>
               {form.formState.errors.role && (
                 <p className="text-red-500 text-sm mt-1">{form.formState.errors.role.message}</p>

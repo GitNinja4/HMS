@@ -20,9 +20,17 @@ export default [
     route("activities-log", "routes/protected/ActivitiesLog.tsx"),
     route("profile/:id", "routes/protected/Profile.tsx"),
     route("financial-history", "routes/protected/FinancialHistory.tsx"),
-    // NEW ROUTES - Placeholder pages
+    // Patient Portal Routes
+    route("patient-dashboard", "routes/protected/PatientDashboard.tsx"),
+    route("patient/appointments", "routes/protected/PatientAppointments.tsx"),
+    route("patient/medical-records", "routes/protected/PatientMedicalRecords.tsx"),
+    route("patient/prescriptions", "routes/protected/PatientPrescriptions.tsx"),
+    route("patient/health-profile", "routes/protected/PatientHealthProfile.tsx"),
+    // NEW ROUTES - Fully Implemented
     route("pharmacy", "routes/protected/Pharmacy.tsx"),
     route("laboratory", "routes/protected/Laboratory.tsx"),
+    route("prescriptions", "routes/protected/Prescriptions.tsx"),
+    route("nursing-station", "routes/protected/NursingStation.tsx"),
     route("appointments", "routes/protected/Appointments.tsx"),
     route("settings", "routes/protected/Settings.tsx"),
     route("telemedicine", "routes/protected/Telemedicine.tsx"),

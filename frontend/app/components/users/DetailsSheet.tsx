@@ -4,21 +4,21 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from "@/app/components/ui/sheet"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs"
-import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar"
-import { ScrollArea } from "@/app/components/ui/scroll-area"
-import { StatusBadge } from "@/app/components/ui/status-badge"
-import { User } from "@/app/types"
-import { OverviewTab } from "@/app/components/users/tabs/Overview"
-import { MedicalHistoryTab } from "@/app/components/users/tabs/MedicalHistory"
-import { PrescriptionsTab } from "@/app/components/users/tabs/PrescriptionHistory"
-import { LabReportsTab } from "@/app/components/users/tabs/LabReports"
+} from "@/components/ui/sheet"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { StatusBadge } from "@/components/ui/status-badge"
+import { User } from "@/types"
+import { OverviewTab } from "@/components/users/tabs/Overview"
+import { MedicalHistoryTab } from "@/components/users/tabs/MedicalHistory"
+import { PrescriptionsTab } from "@/components/users/tabs/PrescriptionHistory"
+import { LabReportsTab } from "@/components/users/tabs/LabReports"
 import {
   getMedicalHistoryByPatientId,
   getPrescriptionsByPatientId,
   getLabResultsByPatientId,
-} from "@/app/lib/mockData"
+} from "@/lib/mockData"
 import { X } from "lucide-react"
 
 interface DetailsSheetProps {

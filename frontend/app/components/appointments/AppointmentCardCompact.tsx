@@ -1,9 +1,9 @@
 import React from "react"
-import { MockAppointment } from "@/app/lib/mockData"
-import { StatusBadge } from "@/app/components/ui/status-badge"
-import { Card } from "@/app/components/ui/card"
-import { Button } from "@/app/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar"
+import { MockAppointment } from "@/lib/mockData"
+import { StatusBadge } from "@/components/ui/status-badge"
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Clock,
   MapPin,

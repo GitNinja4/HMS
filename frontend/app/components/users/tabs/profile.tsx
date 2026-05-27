@@ -4,7 +4,7 @@ import {
   Calendar,
   Droplets,
   Activity,
-  type LucideIcon,
+
 } from "lucide-react";
 import type { User as UserType } from "@/types";
 
@@ -13,7 +13,7 @@ function InfoItem({
   label,
   value,
 }: {
-  icon: LucideIcon;
+  icon: React.ComponentType<any>;
   label: string;
   value?: string;
 }) {

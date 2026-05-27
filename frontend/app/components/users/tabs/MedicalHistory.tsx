@@ -1,6 +1,6 @@
 import React from "react"
-import { AlertCircle, Heart, Knife, Pill, Clock } from "lucide-react"
-import { MockMedicalHistoryEvent } from "@/app/lib/mockData"
+import { AlertCircle, Heart, Activity, Pill, Clock } from "lucide-react"
+import { MockMedicalHistoryEvent } from "@/lib/mockData"
 import { cn } from "@/lib/utils"
 
 interface MedicalHistoryTabProps {
@@ -14,7 +14,7 @@ const getEventIcon = (type: string) => {
     case "condition":
       return <Heart className="h-5 w-5 text-blue-500" />
     case "surgery":
-      return <Knife className="h-5 w-5 text-purple-500" />
+      return <Activity className="h-5 w-5 text-purple-500" />
     case "medication":
       return <Pill className="h-5 w-5 text-green-500" />
     default:

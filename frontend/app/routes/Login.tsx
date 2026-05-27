@@ -10,7 +10,7 @@ import z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
-import { useNavigate, Navigate } from "react-router"; // Import this to redirect
+import { useNavigate, Navigate, Link } from "react-router"; // Import this to redirect
 import { loginSchema } from "@/components/auth/login.schema";
 import Loader from "@/components/global/Loader";
 
@@ -185,6 +185,19 @@ const Login = () => {
               )}
             </Button>
           </form>
+          
+          {/* Sign Up Link */}
+          <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+            <p className="text-center text-slate-600 dark:text-slate-400 text-sm">
+              Don't have an account?{" "}
+              <Link
+                to="/signup"
+                className="font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+              >
+                Create one now
+              </Link>
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

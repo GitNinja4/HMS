@@ -1,7 +1,7 @@
 import React from "react"
-import { User } from "@/app/types"
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar"
+import { User } from "@/types"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Cake,
   Users,

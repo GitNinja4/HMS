@@ -9,6 +9,7 @@ import {
 export default [
   index("routes/home.tsx"),
   route("login", "routes/Login.tsx"),
+  route("signup", "routes/Signup.tsx"),
   // you can use index or layout for nested routes
   layout("routes/protected/layout.tsx", [
     route("dashboard", "routes/protected/Dashboard.tsx"),

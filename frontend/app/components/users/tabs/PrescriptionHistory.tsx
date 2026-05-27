@@ -1,8 +1,8 @@
 import React from "react"
-import { MockPrescription } from "@/app/lib/mockData"
-import { StatusBadge } from "@/app/components/ui/status-badge"
-import { Button } from "@/app/components/ui/button"
-import { Card, CardContent } from "@/app/components/ui/card"
+import { MockPrescription } from "@/lib/mockData"
+import { StatusBadge } from "@/components/ui/status-badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { Pill, RefreshCw, Download } from "lucide-react"
 import { cn } from "@/lib/utils"
 

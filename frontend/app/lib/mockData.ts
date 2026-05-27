@@ -1,4 +1,4 @@
-import { User, LabResult } from "@/app/types"
+import { User, LabResult } from "@/types"
 
 /**
  * Mock Patient Data

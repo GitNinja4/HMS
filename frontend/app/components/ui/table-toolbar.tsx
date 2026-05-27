@@ -4,12 +4,12 @@ import {
   X,
   Filter,
   ChevronDown,
-  LucideIcon,
+
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { Input } from "@/app/components/ui/input"
-import { Button } from "@/app/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,12 +17,12 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel,
-} from "@/app/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu"
 
 interface FilterOption {
   label: string
   value: string
-  icon?: LucideIcon
+  icon?: React.ComponentType<any>
 }
 
 interface TableToolbarProps extends React.HTMLAttributes<HTMLDivElement> {

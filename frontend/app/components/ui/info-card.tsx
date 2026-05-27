@@ -31,7 +31,7 @@ const infoCardVariants = cva(
 interface InfoCardProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof infoCardVariants> {
-  icon?: LucideIcon | React.ReactNode
+  icon?: React.ComponentType<any> | React.ReactNode
   label: string
   value: string | number
   trend?: {

@@ -1,12 +1,12 @@
 import React from "react"
-import { MockAppointment, getAppointmentsByDate } from "@/app/lib/mockData"
-import { Card } from "@/app/components/ui/card"
-import { SkeletonLoader } from "@/app/components/ui/skeleton-loader"
-import { AppointmentCardCompact } from "@/app/components/appointments/AppointmentCardCompact"
-import { EmptyState } from "@/app/components/ui/empty-state"
+import { MockAppointment, getAppointmentsByDate } from "@/lib/mockData"
+import { Card } from "@/components/ui/card"
+import { SkeletonLoader } from "@/components/ui/skeleton-loader"
+import { AppointmentCardCompact } from "@/components/appointments/AppointmentCardCompact"
+import { EmptyState } from "@/components/ui/empty-state"
 import { cn } from "@/lib/utils"
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react"
-import { Button } from "@/app/components/ui/button"
+import { Button } from "@/components/ui/button"
 
 interface AppointmentCalendarProps {
   appointments: MockAppointment[]

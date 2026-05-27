@@ -1,13 +1,13 @@
 import * as React from "react"
-import { ChevronRight, LucideIcon } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { Button } from "@/app/components/ui/button"
+import { Button } from "@/components/ui/button"
 
 interface SectionHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
   title: string
   description?: string
-  icon?: LucideIcon
+  icon?: React.ComponentType<any>
   action?: {
     label: string
     onClick: () => void

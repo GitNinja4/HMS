@@ -5,11 +5,11 @@ import {
   Search,
   AlertTriangle,
   Zap,
-  LucideIcon,
+
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { Button } from "@/app/components/ui/button"
+import { Button } from "@/components/ui/button"
 
 const emptyStateVariants = cva(
   "flex flex-col items-center justify-center rounded-lg border border-dashed gap-4 py-12 px-4",
@@ -33,7 +33,7 @@ const emptyStateVariants = cva(
 interface EmptyStateProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof emptyStateVariants> {
-  icon?: LucideIcon
+  icon?: React.ComponentType<any>
   title: string
   description?: string
   action?: {

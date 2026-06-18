@@ -20,7 +20,7 @@ export function RevenueChart() {
 
   const chartData = useMemo(() => {
     // 1. Check if res exists and is an array
-    const invoices = data?.res || [];
+    const invoices = data?.data || [];
 
     const monthNames = [
       "Jan",

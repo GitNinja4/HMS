@@ -59,7 +59,7 @@ const UserManagement = ({ role, title, description }: UserManagementProps) => {
     subscribed: true,
   });
 
-  const users = data?.res || [];
+  const users = data?.data || [];
   const pagination = data?.pagination;
 
   // socket.io listener for real-time updates

@@ -1,30 +1,35 @@
-import { useMemo } from "react";
-import { Pill, RefreshCw, Download } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Pill, AlertCircle, RefreshCw, TrendingUp } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
-import { getPrescriptionsByPatientId } from "@/lib/mockData";
+import * as api from "@/lib/api";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Loader from "@/components/global/Loader";
+import { Badge } from "@/components/ui/badge";
 
 export function meta() {
   return [{ title: "My Prescriptions" }];
 }
 
 export default function PatientPrescriptions() {
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, isPending: isAuthLoading } = authClient.useSession();
   const user = session?.user;
 
-  // Get patient-specific prescriptions (filtered by patient ID)
-  const mockPrescriptions = useMemo(
-    () => getPrescriptionsByPatientId(user?.id || ""),
-    [user?.id]
-  );
+  // Fetch patient prescriptions
+  const { data: prescriptionsData, isLoading: prescriptionsLoading } = useQuery({
+    queryKey: ["patient-prescriptions", user?.id],
+    queryFn: () =>
+      api.getPatientPrescriptions({
+        patientId: user?.id || "",
+        limit: 100,
+      }),
+    enabled: !!user?.id,
+  });
 
-  if (isPending) {
+  if (isAuthLoading || prescriptionsLoading) {
     return (
       <div className="w-full h-screen flex items-center justify-center">
         <Loader label="Loading prescriptions..." />
@@ -32,132 +37,33 @@ export default function PatientPrescriptions() {
     );
   }
 
-  const activePrescriptions = useMemo(
-    () => mockPrescriptions.filter((p) => p.status === "active"),
-    [mockPrescriptions]
-  );
-  const refillingPrescriptions = useMemo(
-    () => mockPrescriptions.filter((p) => p.status === "refilling"),
-    [mockPrescriptions]
-  );
-  const completedPrescriptions = useMemo(
-    () => mockPrescriptions.filter((p) => p.status === "completed"),
-    [mockPrescriptions]
-  );
+  const prescriptions = prescriptionsData?.data || [];
 
-  const getStatusBadge = (
-    status: string
-  ): "default" | "destructive" | "outline" | "secondary" => {
-    const variants: Record<
-      string,
-      "default" | "destructive" | "outline" | "secondary"
-    > = {
-      active: "default",
-      refilling: "secondary",
-      completed: "outline",
-      cancelled: "destructive",
-    };
-    return variants[status] || "default";
-  };
-
-  const PrescriptionCard = ({ prescription }: { prescription: typeof mockPrescriptions[0] }) => (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h3 className="font-semibold text-lg">{prescription.medicationName}</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Prescribed by {prescription.prescribingDoctor}
-            </p>
-          </div>
-          <Badge variant={getStatusBadge(prescription.status)}>
-            {prescription.status}
-          </Badge>
-        </div>
-
-        <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg mb-4 space-y-3">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Dosage
-              </p>
-              <p className="font-semibold">{prescription.dosage}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Frequency
-              </p>
-              <p className="font-semibold">{prescription.frequency}</p>
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-              Instructions
-            </p>
-            <p className="text-sm">{prescription.instructions}</p>
-          </div>
-
-          {prescription.status === "active" || prescription.status === "refilling" ? (
-            <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Refills Remaining
-              </p>
-              <p className="font-semibold text-sm">
-                {prescription.refillsRemaining} refills
-              </p>
-            </div>
-          ) : null}
-        </div>
-
-        {prescription.endDate && (
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-            Ends: {new Date(prescription.endDate).toLocaleDateString()}
-          </p>
-        )}
-
-        <div className="flex gap-2">
-          {prescription.status === "active" && prescription.refillsRemaining > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 gap-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Request Refill
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1 gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Download
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  // Filter prescriptions by status
+  const activePrescriptions = prescriptions.filter((p) => p.status === "active" || p.status === "dispensed");
+  const refillingPrescriptions = prescriptions.filter((p) => p.status === "refill_requested" || p.status === "refilling");
+  const completedPrescriptions = prescriptions.filter((p) => p.status === "completed" || p.status === "expired");
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <SectionHeader
-        title="My Prescriptions"
-        description="View and manage your active medications and prescriptions"
-        icon={Pill}
-      />
+      <div>
+        <SectionHeader
+          title="My Prescriptions"
+          description="View and manage your medication prescriptions"
+          icon={Pill}
+        />
+      </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
                 Active
               </p>
-              <p className="text-3xl font-bold">{activePrescriptions.length}</p>
+              <p className="text-3xl font-bold text-green-600">{activePrescriptions.length}</p>
             </div>
           </CardContent>
         </Card>
@@ -167,7 +73,7 @@ export default function PatientPrescriptions() {
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
                 Refilling
               </p>
-              <p className="text-3xl font-bold">{refillingPrescriptions.length}</p>
+              <p className="text-3xl font-bold text-yellow-600">{refillingPrescriptions.length}</p>
             </div>
           </CardContent>
         </Card>
@@ -175,9 +81,19 @@ export default function PatientPrescriptions() {
           <CardContent className="pt-6">
             <div className="text-center">
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
-                History
+                Completed
               </p>
-              <p className="text-3xl font-bold">{completedPrescriptions.length}</p>
+              <p className="text-3xl font-bold text-blue-600">{completedPrescriptions.length}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+                Total
+              </p>
+              <p className="text-3xl font-bold">{prescriptions.length}</p>
             </div>
           </CardContent>
         </Card>
@@ -186,9 +102,9 @@ export default function PatientPrescriptions() {
       {/* Tabs */}
       <Tabs defaultValue="active" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="active">Active</TabsTrigger>
-          <TabsTrigger value="refilling">Refilling</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
+          <TabsTrigger value="active">Active ({activePrescriptions.length})</TabsTrigger>
+          <TabsTrigger value="refilling">Refilling ({refillingPrescriptions.length})</TabsTrigger>
+          <TabsTrigger value="completed">Completed ({completedPrescriptions.length})</TabsTrigger>
         </TabsList>
 
         {/* Active Prescriptions */}
@@ -196,15 +112,56 @@ export default function PatientPrescriptions() {
           {activePrescriptions.length === 0 ? (
             <EmptyState
               title="No Active Prescriptions"
-              description="You don't have any active prescriptions"
+              description="You don't have any active prescriptions at the moment"
               icon={Pill}
             />
           ) : (
-            <div className="grid gap-4">
-              {activePrescriptions.map((rx) => (
-                <PrescriptionCard key={rx.id} prescription={rx} />
-              ))}
-            </div>
+            activePrescriptions.map((rx) => (
+              <Card key={rx.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-lg">{rx.medication_name}</h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {rx.dosage} • {rx.frequency}
+                      </p>
+                    </div>
+                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                      {rx.status}
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-2 text-sm mb-4">
+                    <p className="text-slate-600 dark:text-slate-300">
+                      <strong>Duration:</strong> {rx.duration}
+                    </p>
+                    <p className="text-slate-600 dark:text-slate-300">
+                      <strong>Quantity:</strong> {rx.quantity} {rx.route || 'tablets'}
+                    </p>
+                    {rx.instructions && (
+                      <p className="text-slate-600 dark:text-slate-300">
+                        <strong>Instructions:</strong> {rx.instructions}
+                      </p>
+                    )}
+                    {rx.warnings && (
+                      <p className="text-red-600 dark:text-red-400 font-medium">
+                        ⚠️ {rx.warnings}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 gap-2">
+                      <RefreshCw className="h-4 w-4" />
+                      Request Refill
+                    </Button>
+                    <Button size="sm" variant="outline">
+                      View Details
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
           )}
         </TabsContent>
 
@@ -213,32 +170,73 @@ export default function PatientPrescriptions() {
           {refillingPrescriptions.length === 0 ? (
             <EmptyState
               title="No Refilling Prescriptions"
-              description="No prescriptions are currently being refilled"
-              icon={Pill}
+              description="You don't have any prescriptions pending refill"
+              icon={TrendingUp}
             />
           ) : (
-            <div className="grid gap-4">
-              {refillingPrescriptions.map((rx) => (
-                <PrescriptionCard key={rx.id} prescription={rx} />
-              ))}
-            </div>
+            refillingPrescriptions.map((rx) => (
+              <Card key={rx.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-lg">{rx.medication_name}</h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {rx.dosage} • {rx.frequency}
+                      </p>
+                    </div>
+                    <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                      {rx.status}
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-2 text-sm mb-4">
+                    <p className="text-slate-600 dark:text-slate-300">
+                      <strong>Quantity:</strong> {rx.quantity} {rx.route || 'tablets'}
+                    </p>
+                    <p className="text-slate-600 dark:text-slate-300 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded">
+                      Your refill request is being processed. Pharmacy will contact you soon.
+                    </p>
+                  </div>
+
+                  <Button size="sm" variant="outline">
+                    Track Status
+                  </Button>
+                </CardContent>
+              </Card>
+            ))
           )}
         </TabsContent>
 
-        {/* History */}
-        <TabsContent value="history" className="space-y-4">
+        {/* Completed Prescriptions */}
+        <TabsContent value="completed" className="space-y-4">
           {completedPrescriptions.length === 0 ? (
             <EmptyState
-              title="No Prescription History"
+              title="No Completed Prescriptions"
               description="Your completed prescriptions will appear here"
               icon={Pill}
             />
           ) : (
-            <div className="grid gap-4">
-              {completedPrescriptions.map((rx) => (
-                <PrescriptionCard key={rx.id} prescription={rx} />
-              ))}
-            </div>
+            completedPrescriptions.map((rx) => (
+              <Card key={rx.id} className="opacity-75">
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-lg">{rx.medication_name}</h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {rx.dosage}
+                      </p>
+                    </div>
+                    <Badge className="bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200">
+                      {rx.status}
+                    </Badge>
+                  </div>
+
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Completed on {new Date(rx.created_at || Date.now()).toLocaleDateString()}
+                  </p>
+                </CardContent>
+              </Card>
+            ))
           )}
         </TabsContent>
       </Tabs>

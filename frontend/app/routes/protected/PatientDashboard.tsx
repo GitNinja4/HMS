@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
-import { mockPatients, mockAppointments, mockPrescriptions } from "@/lib/mockData";
+import * as api from "@/lib/api";
 import Loader from "@/components/global/Loader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   Heart,
   ChevronRight,
   AlertCircle,
+  Plus,
 } from "lucide-react";
 import { Link } from "react-router";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,46 @@ export default function PatientDashboard() {
   const { data: session, isPending: isAuthLoading } = authClient.useSession();
   const user = session?.user;
 
+  // Fetch patient appointments
+  const { data: appointmentsData, isLoading: appointmentsLoading } = useQuery({
+    queryKey: ["appointments", user?.id],
+    queryFn: () =>
+      api.getPatientAppointments({
+        patientId: user?.id || "",
+        limit: 100,
+      }),
+    enabled: !!user?.id,
+  });
+
+  // Fetch patient prescriptions
+  const { data: prescriptionsData, isLoading: prescriptionsLoading } = useQuery({
+    queryKey: ["prescriptions", user?.id],
+    queryFn: () =>
+      api.getPatientPrescriptions({
+        patientId: user?.id || "",
+        limit: 100,
+      }),
+    enabled: !!user?.id,
+  });
+
+  // Fetch patient vital signs (latest)
+  const { data: vitalsData } = useQuery({
+    queryKey: ["vitals", user?.id],
+    queryFn: () =>
+      api.getPatientVitalSigns({
+        patientId: user?.id || "",
+        limit: 1,
+      }),
+    enabled: !!user?.id,
+  });
+
+  // Fetch assigned doctor info
+  const { data: assignedDoctor } = useQuery({
+    queryKey: ["assignedDoctor", user?.assigned_doctor_id],
+    queryFn: () => (user?.assigned_doctor_id ? api.getUserById(user.assigned_doctor_id) : null),
+    enabled: !!user?.assigned_doctor_id,
+  });
+
   if (isAuthLoading) {
     return (
       <div className="w-full h-screen flex items-center justify-center">
@@ -31,30 +72,33 @@ export default function PatientDashboard() {
     );
   }
 
-  // Get patient's appointments
-  const patientAppointments = mockAppointments.filter(
-    (apt) =>
-      apt.patientName.toLowerCase() === user?.name?.toLowerCase() ||
-      apt.patientId === user?.id
+  const appointments = appointmentsData?.data || [];
+  const prescriptions = prescriptionsData?.data || [];
+
+  // Filter appointments
+  const upcomingAppointments = appointments.filter(
+    (apt) => new Date(apt.scheduled_at) > new Date()
   );
 
-  const upcomingAppointments = patientAppointments.filter(
-    (apt) => new Date(apt.appointmentDate) > new Date()
-  );
+  const nextAppointment = upcomingAppointments
+    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
+    .at(0) || null;
 
-  const nextAppointment =
-    upcomingAppointments.length > 0
-      ? upcomingAppointments.sort(
-          (a, b) =>
-            new Date(a.appointmentDate).getTime() -
-            new Date(b.appointmentDate).getTime()
-        )[0]
-      : null;
+  const activePrescriptions = prescriptions.filter((p) => p.status === "active" || p.status === "dispensed");
 
-  // Mock active prescriptions
-  const activePrescriptions = mockPrescriptions?.filter(
-    (p) => p.status === "active"
-  ) || [];
+  // Calculate health score (placeholder - can be enhanced later)
+  const calculateHealthScore = () => {
+    let score = 85;
+    if (vitalsData?.data && vitalsData.data.length > 0) {
+      const latest = vitalsData.data[0];
+      // Adjust score based on vitals (example logic)
+      if (latest.blood_pressure_systolic > 140 || latest.blood_pressure_diastolic > 90) score -= 10;
+      if (latest.heart_rate > 100 || latest.heart_rate < 60) score -= 5;
+    }
+    return Math.max(0, Math.min(100, score));
+  };
+
+  const healthScore = calculateHealthScore();
 
   return (
     <div className="space-y-8">
@@ -79,7 +123,9 @@ export default function PatientDashboard() {
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">
                   Upcoming Appointments
                 </p>
-                <p className="text-3xl font-bold">{upcomingAppointments.length}</p>
+                <p className="text-3xl font-bold">
+                  {appointmentsLoading ? "..." : upcomingAppointments.length}
+                </p>
               </div>
               <Calendar className="h-5 w-5 text-blue-500" />
             </div>
@@ -93,7 +139,9 @@ export default function PatientDashboard() {
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">
                   Active Medications
                 </p>
-                <p className="text-3xl font-bold">{activePrescriptions.length}</p>
+                <p className="text-3xl font-bold">
+                  {prescriptionsLoading ? "..." : activePrescriptions.length}
+                </p>
               </div>
               <Pill className="h-5 w-5 text-green-500" />
             </div>
@@ -107,7 +155,9 @@ export default function PatientDashboard() {
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">
                   Total Appointments
                 </p>
-                <p className="text-3xl font-bold">{patientAppointments.length}</p>
+                <p className="text-3xl font-bold">
+                  {appointmentsLoading ? "..." : appointments.length}
+                </p>
               </div>
               <FileText className="h-5 w-5 text-purple-500" />
             </div>
@@ -121,7 +171,7 @@ export default function PatientDashboard() {
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">
                   Health Score
                 </p>
-                <p className="text-3xl font-bold">85%</p>
+                <p className="text-3xl font-bold">{healthScore}%</p>
               </div>
               <Heart className="h-5 w-5 text-red-500" />
             </div>
@@ -134,7 +184,13 @@ export default function PatientDashboard() {
         {/* LEFT COLUMN (8 Units) */}
         <div className="lg:col-span-8 space-y-8">
           {/* Next Appointment */}
-          {nextAppointment ? (
+          {appointmentsLoading ? (
+            <Card>
+              <CardContent className="pt-6">
+                <Loader label="Loading appointments..." />
+              </CardContent>
+            </Card>
+          ) : nextAppointment ? (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -147,10 +203,10 @@ export default function PatientDashboard() {
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <p className="font-semibold text-lg">
-                        {nextAppointment.doctorName}
+                        {nextAppointment.title || "Medical Appointment"}
                       </p>
                       <p className="text-sm text-slate-600 dark:text-slate-400">
-                        {nextAppointment.department}
+                        {nextAppointment.appointment_type}
                       </p>
                     </div>
                     <Badge>{nextAppointment.status}</Badge>
@@ -159,10 +215,16 @@ export default function PatientDashboard() {
                   <div className="space-y-2 text-sm mb-4">
                     <p>
                       📅{" "}
-                      {new Date(nextAppointment.appointmentDate).toLocaleDateString()}
+                      {new Date(nextAppointment.scheduled_at).toLocaleDateString()}
                     </p>
-                    <p>🕐 {nextAppointment.appointmentTime}</p>
-                    <p>📍 Room {nextAppointment.roomNumber}</p>
+                    <p>
+                      🕐{" "}
+                      {new Date(nextAppointment.scheduled_at).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                    {nextAppointment.location && <p>📍 {nextAppointment.location}</p>}
                   </div>
 
                   <div className="flex gap-2">
@@ -175,9 +237,11 @@ export default function PatientDashboard() {
                         View All
                       </Button>
                     </Link>
-                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                      Join Virtual
-                    </Button>
+                    {nextAppointment.meeting_link && (
+                      <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                        Join Virtual
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -216,22 +280,24 @@ export default function PatientDashboard() {
               </Link>
             </CardHeader>
             <CardContent>
-              {activePrescriptions.length === 0 ? (
+              {prescriptionsLoading ? (
+                <Loader label="Loading prescriptions..." />
+              ) : activePrescriptions.length === 0 ? (
                 <p className="text-slate-500 dark:text-slate-400 text-sm">
                   No active medications
                 </p>
               ) : (
                 <ul className="space-y-3">
-                  {activePrescriptions.slice(0, 3).map((med, idx) => (
+                  {activePrescriptions.slice(0, 3).map((med) => (
                     <li
-                      key={idx}
+                      key={med.id}
                       className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg"
                     >
                       <p className="font-semibold text-sm">
-                        {med.medicationName} - {med.dosage}
+                        {med.medication_name} - {med.dosage}
                       </p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {med.frequency}
+                        {med.frequency} for {med.duration}
                       </p>
                     </li>
                   ))}
@@ -245,20 +311,24 @@ export default function PatientDashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <AlertCircle className="h-5 w-5" />
-                Health Alerts
+                Health Alerts & Reminders
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-100 dark:border-yellow-900/30 rounded-lg">
-                <p className="text-sm font-semibold">⚠️ Medication Reminder</p>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                  Take Lisinopril today at 8:00 AM
-                </p>
-              </div>
+              {activePrescriptions.length > 0 && (
+                <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-100 dark:border-yellow-900/30 rounded-lg">
+                  <p className="text-sm font-semibold">⚠️ Medication Reminder</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                    Take {activePrescriptions[0]?.medication_name || "your medications"} as scheduled
+                  </p>
+                </div>
+              )}
               <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-lg">
-                <p className="text-sm font-semibold">ℹ️ Lab Results Ready</p>
+                <p className="text-sm font-semibold">ℹ️ Upcoming Appointment</p>
                 <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                  Your recent blood work results are available for review
+                  {nextAppointment
+                    ? `You have an appointment on ${new Date(nextAppointment.scheduled_at).toLocaleDateString()}`
+                    : "Schedule your next appointment with your doctor"}
                 </p>
               </div>
             </CardContent>
@@ -300,8 +370,8 @@ export default function PatientDashboard() {
             </CardContent>
           </Card>
 
-          {/* My Doctor */}
-          {user && (
+          {/* Assigned Doctor */}
+          {assignedDoctor ? (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Assigned Doctor</CardTitle>
@@ -309,18 +379,22 @@ export default function PatientDashboard() {
               <CardContent>
                 <div className="text-center">
                   <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full mx-auto mb-3" />
-                  <p className="font-semibold">Dr. Sarah Mitchell</p>
+                  <p className="font-semibold">{assignedDoctor.name}</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Cardiologist
+                    {assignedDoctor.specialization || "Medical Professional"}
                   </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full mt-4 gap-2"
-                  >
-                    Message Doctor
-                  </Button>
                 </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">No Assigned Doctor</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  You haven't been assigned a doctor yet. Contact administration to get started.
+                </p>
               </CardContent>
             </Card>
           )}

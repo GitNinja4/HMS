@@ -50,25 +50,21 @@ const Login = () => {
   const onSubmit = async (data: LoginFormValues) => {
     setGlobalError("");
     setIsLoading(true);
-    await authClient.signIn.email(
-      {
-        email: data.email,
-        password: data.password,
-        rememberMe: data.rememberMe,
-      },
-      {
-        // Optional: Callbacks for cleaner logic
-        onSuccess: () => {
-          // we need to fix toast as it was not showing
-          toast.success("Login Successful!");
-          navigate("/dashboard"); // 👈 Redirect user after login
-        },
-        onError: (ctx) => {
-          // ctx.error.message contains the server response (e.g. "Invalid password")
-          setGlobalError(ctx.error.message);
-        },
-      },
-    );
+    
+    try {
+      await authClient.login(data.email, data.password);
+
+      if (data.rememberMe) {
+        localStorage.setItem("remember_me", "true");
+      }
+
+      toast.success("Login Successful!");
+      navigate("/dashboard");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Invalid email or password";
+      setGlobalError(errorMessage);
+    }
+
     setIsLoading(false);
   };
   // console.log(form.formState.errors);

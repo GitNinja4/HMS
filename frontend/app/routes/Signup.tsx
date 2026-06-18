@@ -19,14 +19,19 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-// Sign-up validation schema
+// Sign-up validation schema with proper password complexity
 const signupSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .refine((pass) => /[A-Z]/.test(pass), "Password must contain at least one uppercase letter")
+    .refine((pass) => /[a-z]/.test(pass), "Password must contain at least one lowercase letter")
+    .refine((pass) => /[0-9]/.test(pass), "Password must contain at least one number")
+    .refine((pass) => /[!@#$%^&*()_+\-=\[\]{};:'",./<>?/\\|`~]/.test(pass), "Password must contain at least one special character"),
   confirmPassword: z.string().min(8, "Please confirm your password"),
   organization: z.string().min(2, "Organization name is required"),
-  role: z.enum(["admin", "doctor", "nurse", "patient"], {
+  role: z.enum(["admin", "doctor", "nurse", "pharmacist", "lab_tech", "patient"], {
     errorMap: () => ({ message: "Please select a role" }),
   }),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -72,39 +77,23 @@ const Signup = () => {
     setIsLoading(true);
 
     try {
-      // Call signup endpoint
-      await authClient.signUp.email(
-        {
-          email: data.email,
-          password: data.password,
-          name: data.name,
-        },
-        {
-          onSuccess: async () => {
-            toast.success("Account created! Logging you in...");
-            // Auto-login after signup
-            await authClient.signIn.email(
-              {
-                email: data.email,
-                password: data.password,
-              },
-              {
-                onSuccess: () => {
-                  navigate("/dashboard");
-                },
-                onError: (ctx) => {
-                  setGlobalError(ctx.error.message || "Failed to auto-login");
-                },
-              }
-            );
-          },
-          onError: (ctx) => {
-            setGlobalError(ctx.error.message || "Failed to create account");
-          },
-        }
+      // Use the auth client to signup
+      await authClient.signup(
+        data.email,
+        data.password,
+        data.name,
+        data.role,
+        data.organization
       );
+
+      toast.success("Account created! Logging you in...");
+      
+      // Redirect to dashboard
+      navigate("/dashboard");
     } catch (error) {
-      setGlobalError("An unexpected error occurred. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred. Please try again.";
+      setGlobalError(errorMessage);
+      toast.error(errorMessage);
     }
 
     setIsLoading(false);
@@ -191,10 +180,12 @@ const Signup = () => {
                 className="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
                 aria-label="Professional role"
               >
+                <option value="patient">Patient</option>
                 <option value="doctor">Doctor</option>
                 <option value="nurse">Nurse</option>
+                <option value="pharmacist">Pharmacist</option>
+                <option value="lab_tech">Lab Technician</option>
                 <option value="admin">Administrator</option>
-                <option value="patient">Patient</option>
               </select>
               {form.formState.errors.role && (
                 <p className="text-red-500 text-sm mt-1">{form.formState.errors.role.message}</p>
@@ -202,16 +193,28 @@ const Signup = () => {
             </div>
 
             {/* Password */}
-            <CustomInput
-              control={form.control}
-              name="password"
-              label="Password"
-              placeholder="••••••••"
-              type="password"
-              startIcon={<Lock size={18} />}
-              autoComplete="new-password"
-              required
-            />
+            <div>
+              <CustomInput
+                control={form.control}
+                name="password"
+                label="Password"
+                placeholder="••••••••"
+                type="password"
+                startIcon={<Lock size={18} />}
+                autoComplete="new-password"
+                required
+              />
+              <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+                <p className="font-medium mb-1">Password must contain:</p>
+                <ul className="space-y-1 ml-2">
+                  <li className={form.watch('password')?.length >= 8 ? 'text-green-600' : 'text-slate-500'}>✓ At least 8 characters</li>
+                  <li className={/[A-Z]/.test(form.watch('password') || '') ? 'text-green-600' : 'text-slate-500'}>✓ One uppercase letter</li>
+                  <li className={/[a-z]/.test(form.watch('password') || '') ? 'text-green-600' : 'text-slate-500'}>✓ One lowercase letter</li>
+                  <li className={/[0-9]/.test(form.watch('password') || '') ? 'text-green-600' : 'text-slate-500'}>✓ One number</li>
+                  <li className={/[!@#$%^&*()_+\-=\[\]{};:'",./<>?/\\|`~]/.test(form.watch('password') || '') ? 'text-green-600' : 'text-slate-500'}>✓ One special character</li>
+                </ul>
+              </div>
+            </div>
 
             {/* Confirm Password */}
             <CustomInput

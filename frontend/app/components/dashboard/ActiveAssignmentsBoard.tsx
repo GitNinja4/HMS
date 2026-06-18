@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getUsers } from "@/lib/api";
+import { getUsers, getDoctorPatients, getNursePatients } from "@/lib/api";
 import { authClient } from "@/lib/auth-client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -19,17 +19,31 @@ export default function ActiveAssignmentsBoard() {
   const { data: session } = authClient.useSession();
   const currentUser = session?.user;
 
-  // 2. Fetch all patients (You can also create a dedicated endpoint for just 'admitted' patients to save bandwidth)
+  // 2. Fetch patients based on user role
+  const shouldFetchAll = currentUser?.role === "admin";
+  const shouldFetchDoctor = currentUser?.role === "doctor";
+  const shouldFetchNurse = currentUser?.role === "nurse";
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["users", "patient", "admissions"],
-    // Fetch a larger limit for the dashboard board
-    queryFn: () => getUsers({ role: "patient", limit: 50 }),
+    queryKey: ["users", "patient", "admissions", currentUser?.id, currentUser?.role],
+    queryFn: () => {
+      if (shouldFetchAll) {
+        return getUsers({ role: "patient", limit: 50 });
+      } else if (shouldFetchDoctor) {
+        return getDoctorPatients({ doctorId: currentUser.id!, limit: 50 });
+      } else if (shouldFetchNurse) {
+        return getNursePatients({ nurseId: currentUser.id!, limit: 50 });
+      }
+      // For other roles, return empty
+      return Promise.resolve({ data: [] });
+    },
+    enabled: !!currentUser && (shouldFetchAll || shouldFetchDoctor || shouldFetchNurse),
   });
 
   // Filter only admitted patients who have been assigned a doctor
-  const activeAssignments = (data?.res || []).filter(
+  const activeAssignments = (data?.data || []).filter(
     (patient: User) =>
-      patient.status === "admitted" && patient.assignedDoctorId,
+      patient.status === "admitted" && patient.assigned_doctor_id,
   );
 
   if (isLoading) {
@@ -76,18 +90,18 @@ export default function ActiveAssignmentsBoard() {
           // --- HIGHLIGHT LOGIC ---
           const isMyPatientAsDoctor =
             currentUser?.role === "doctor" &&
-            patient.assignedDoctorId === currentUser?.id;
+            patient.assigned_doctor_id === currentUser?.id;
           const isMyPatientAsNurse =
             currentUser?.role === "nurse" &&
-            patient.assignedNurseId === currentUser?.id;
+            patient.assigned_nurse_id === currentUser?.id;
           const isMeAsPatient =
-            currentUser?.role === "patient" && patient._id === currentUser?.id;
+            currentUser?.role === "patient" && patient.id === currentUser?.id;
 
           const isHighlighted =
             isMyPatientAsDoctor || isMyPatientAsNurse || isMeAsPatient;
           return (
             <Card
-              key={patient._id}
+              key={patient.id}
               className={cn(
                 "overflow-hidden transition-all duration-300 relative",
                 isHighlighted

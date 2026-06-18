@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react"
-import { mockPatients } from "@/lib/mockData"
+import { useQuery } from "@tanstack/react-query"
+import { getUsers } from "@/lib/api"
 import { User } from "@/types"
 import { SectionHeader } from "@/components/ui/section-header"
 import { TableToolbar } from "@/components/ui/table-toolbar"
@@ -8,6 +9,7 @@ import { PatientCard } from "@/components/users/PatientCard"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Button } from "@/components/ui/button"
 import { Users, Plus } from "lucide-react"
+import Loader from "@/components/global/Loader"
 
 export function meta() {
   return [{ title: "Patients" }]
@@ -19,21 +21,29 @@ const Patients = () => {
   const [selectedPatient, setSelectedPatient] = useState<User | null>(null)
   const [isSheetOpen, setIsSheetOpen] = useState(false)
 
+  // Fetch patients from API
+  const { data: patientsData, isLoading } = useQuery({
+    queryKey: ["patients"],
+    queryFn: () => getUsers({ role: "patient", limit: 1000 }),
+  })
+
+  const patients = patientsData?.users || []
+
   // Filter patients based on search and status
   const filteredPatients = useMemo(() => {
-    return mockPatients.filter((patient) => {
+    return patients.filter((patient: User) => {
       const matchesSearch =
         searchValue === "" ||
         patient.name.toLowerCase().includes(searchValue.toLowerCase()) ||
         patient.email.toLowerCase().includes(searchValue.toLowerCase()) ||
-        patient._id.includes(searchValue)
+        patient.id.toString().includes(searchValue)
 
       const matchesStatus =
         !statusFilter || patient.status === statusFilter
 
       return matchesSearch && matchesStatus
     })
-  }, [searchValue, statusFilter])
+  }, [searchValue, statusFilter, patients])
 
   const handleViewPatient = (patient: User) => {
     setSelectedPatient(patient)
@@ -52,13 +62,21 @@ const Patients = () => {
 
   const activeFiltersCount = (searchValue ? 1 : 0) + (statusFilter ? 1 : 0)
 
+  if (isLoading) {
+    return (
+      <div className="w-full h-96 flex items-center justify-center">
+        <Loader label="Loading patients..." />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <SectionHeader
           title="Patient Directory"
-          description={`${mockPatients.length} total patients • ${filteredPatients.length} visible`}
+          description={`${patients.length} total patients • ${filteredPatients.length} visible`}
           icon={Users}
           action={{ label: "Add Patient", onClick: () => {} }}
         />
@@ -87,9 +105,9 @@ const Patients = () => {
       {/* Patient Cards Grid */}
       {filteredPatients.length > 0 ? (
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {filteredPatients.map((patient) => (
+          {filteredPatients.map((patient: User) => (
             <PatientCard
-              key={patient._id}
+              key={patient.id}
               patient={patient}
               onClick={() => handleViewPatient(patient)}
             />

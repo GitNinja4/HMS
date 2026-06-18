@@ -27,52 +27,45 @@ export type StaffStatus = "active" | "on_leave" | "suspended" | "resigned";
 export type UserStatus = PatientStatus | StaffStatus;
 
 export interface LabResult {
-  _id: string;
-  patientId: string;
-  testType: string;
-  bodyPart: string;
-  imageUrl: string;
-  aiAnalysis: string;
+  id: number;
+  patient_id: number;
+  test_type: string;
+  body_part: string;
+  image_url: string;
+  ai_analysis?: string;
   status: "pending" | "analyzed" | "reviewed";
-  doctorNotes: string;
-  createdAt: string;
+  doctor_notes?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface User {
-  _id: string; // MongoDB uses _id. Change to 'id' if you transform it on backend.
+  id: number;
   name: string;
   email: string;
   image?: string | null;
   role: Role;
-  emailVerified: boolean;
-  createdAt: string;
-  updatedAt: string;
+  email_verified: boolean;
+  created_at: string;
+  updated_at: string;
   status: UserStatus;
-  banned: boolean; // For staff, indicates if they are banned from the system
+  banned: boolean;
   specialization?: string;
   gender?: string;
-  bloodgroup?: string;
-  medicalHistory?: string;
+  blood_group?: string;
+  medical_history?: string;
   age?: string;
   department?: string;
-  labResults?: LabResult[];
-  prescriptions?: string[];
-  appointmentsXRay?: string[];
-  assignedDoctorId?: string | null;
-  assignedNurseId?: string | null;
-  triageReasoning?: string;
-  assignedDoctorName?: string;
-  assignedNurseName?: string;
+  license_number?: string;
+  assigned_doctor_id?: number | null;
+  assigned_nurse_id?: number | null;
 }
 
 export interface PaginatedResponse<T> {
-  res: T[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalData: number;
-    limit: number;
-  };
+  data: T[];
+  total: number;
+  skip: number;
+  limit: number;
 }
 
 export interface Notification {
@@ -118,15 +111,58 @@ export interface invoice {
 }
 
 export interface appointment {
-  _id: string;
-  patientId: string;
-  doctorId: string;
-  nurseId?: string;
-  date: Date;
-  time: string;
-  reason: string;
-  status: "scheduled" | "confirmed" | "completed" | "cancelled" | "in-progress";
-  isVirtual: boolean;
-  meetingId: string; // Used as the LiveKit Room Name
-  createdAt: Date;
+  id: number;
+  patient_id: number;
+  doctor_id: number;
+  nurse_id?: number;
+  title: string;
+  description?: string;
+  appointment_type: "in_person" | "telehealth" | "follow_up" | "emergency";
+  status: "scheduled" | "confirmed" | "in_progress" | "completed" | "cancelled" | "no_show";
+  scheduled_at: string;
+  duration_minutes: number;
+  location?: string;
+  meeting_link?: string;
+  notes?: string;
+  patient_notes?: string;
+  cancellation_reason?: string;
+  reminder_sent: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// --- PRESCRIPTION TYPES ---
+export type PrescriptionStatus = 
+  | "active" 
+  | "dispensed" 
+  | "completed" 
+  | "cancelled" 
+  | "expired";
+
+export interface Prescription {
+  id: number;
+  patient_id: number;
+  doctor_id: number;
+  appointment_id?: number;
+  medication_name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  route: string;
+  quantity: number;
+  quantity_dispensed: number;
+  instructions?: string;
+  warnings?: string;
+  refills_allowed: number;
+  refills_used: number;
+  status: PrescriptionStatus;
+  issued_date: string;
+  expiry_date?: string;
+  dispensed_date?: string;
+  dispensed_by_id?: number;
+  cancelled_date?: string;
+  cancellation_reason?: string;
+  cancelled_by_id?: number;
+  created_at: string;
+  updated_at: string;
 }

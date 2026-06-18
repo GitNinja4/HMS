@@ -1,50 +1,31 @@
-import { useState, useMemo } from "react";
-import { FileText, Download, Eye, Filter } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { FileText, AlertCircle, Download, Eye } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
-import { getLabResultsByPatientId } from "@/lib/mockData";
+import * as api from "@/lib/api";
 import { SectionHeader } from "@/components/ui/section-header";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Loader from "@/components/global/Loader";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export function meta() {
   return [{ title: "My Medical Records" }];
 }
 
 export default function PatientMedicalRecords() {
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, isPending: isAuthLoading } = authClient.useSession();
   const user = session?.user;
-  const [selectedRecord, setSelectedRecord] = useState<any>(null);
-  const [showDetails, setShowDetails] = useState(false);
 
-  // Get patient-specific lab results (filtered by patient ID)
-  const mockLabResults = useMemo(
-    () => getLabResultsByPatientId(user?.id || ""),
-    [user?.id]
-  );
+  // Fetch lab results
+  const { data: labResultsData, isLoading: labResultsLoading } = useQuery({
+    queryKey: ["lab-results", user?.id],
+    queryFn: () => api.getPatientLabResults(user?.id || ""),
+    enabled: !!user?.id,
+  });
 
-  // Mock X-rays for this patient
-  const mockXRays = [
-    {
-      id: "xray-001",
-      name: "Chest X-Ray",
-      date: "2024-05-18",
-      status: "reviewed",
-      findings: "No abnormalities detected",
-    },
-    {
-      id: "xray-002",
-      name: "Spinal X-Ray",
-      date: "2024-04-30",
-      status: "reviewed",
-      findings: "Mild degenerative changes at L4-L5 level",
-    },
-  ];
-
-  if (isPending) {
+  if (isAuthLoading || labResultsLoading) {
     return (
       <div className="w-full h-screen flex items-center justify-center">
         <Loader label="Loading records..." />
@@ -52,21 +33,12 @@ export default function PatientMedicalRecords() {
     );
   }
 
-  const getStatusBadge = (
-    status: string
-  ): "default" | "destructive" | "outline" | "secondary" => {
-    const variants: Record<
-      string,
-      "default" | "destructive" | "outline" | "secondary"
-    > = {
-      completed: "default",
-      reviewed: "default",
-      pending: "secondary",
-      processing: "outline",
-      error: "destructive",
-    };
-    return variants[status] || "default";
-  };
+  const labResults = (labResultsData as any[]) || [];
+
+  // Categorize results
+  const labTests = labResults.filter((r) => r.test_type === "lab_test");
+  const xrays = labResults.filter((r) => r.test_type === "xray");
+  const scans = labResults.filter((r) => r.test_type === "scan" || r.test_type === "ct_scan" || r.test_type === "mri");
 
   return (
     <div className="space-y-6">
@@ -77,144 +49,235 @@ export default function PatientMedicalRecords() {
         icon={FileText}
       />
 
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+                Lab Results
+              </p>
+              <p className="text-3xl font-bold text-blue-600">{labTests.length}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+                X-Rays
+              </p>
+              <p className="text-3xl font-bold text-purple-600">{xrays.length}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+                Scans
+              </p>
+              <p className="text-3xl font-bold text-pink-600">{scans.length}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+                Total
+              </p>
+              <p className="text-3xl font-bold">{labResults.length}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Tabs defaultValue="labs" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="labs">Lab Results</TabsTrigger>
-          <TabsTrigger value="xrays">X-Rays & Imaging</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="labs">Lab Results ({labTests.length})</TabsTrigger>
+          <TabsTrigger value="xrays">X-Rays ({xrays.length})</TabsTrigger>
+          <TabsTrigger value="scans">Scans ({scans.length})</TabsTrigger>
         </TabsList>
 
         {/* Lab Results */}
         <TabsContent value="labs" className="space-y-4">
-          {mockLabResults.length === 0 ? (
+          {labTests.length === 0 ? (
             <EmptyState
               title="No Lab Results"
-              description="Your lab results will appear here"
+              description="Your laboratory test results will appear here"
               icon={FileText}
             />
           ) : (
-            <div className="grid gap-4">
-              {mockLabResults.map((lab) => (
-                <Card key={lab.id}>
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="font-semibold text-lg">{lab.testName}</h3>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                          {new Date(lab.date).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Badge variant={getStatusBadge(lab.status)}>
-                        {lab.status}
-                      </Badge>
-                    </div>
-
-                    <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg mb-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        {Object.entries(lab.results).map(([key, value]) => (
-                          <div key={key}>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                              {key.replace(/_/g, " ")}
-                            </p>
-                            <p className="font-semibold text-sm">{value}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 gap-2"
-                        onClick={() => {
-                          setSelectedRecord(lab);
-                          setShowDetails(true);
-                        }}
-                      >
-                        <Eye className="h-4 w-4" />
-                        View Details
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 gap-2"
-                      >
-                        <Download className="h-4 w-4" />
-                        Download
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* X-Rays & Imaging */}
-        <TabsContent value="xrays" className="space-y-4">
-          {mockXRays.length === 0 ? (
-            <EmptyState
-              title="No Imaging Records"
-              description="Your X-rays and imaging results will appear here"
-              icon={FileText}
-            />
-          ) : (
-            <div className="grid gap-4">
-              {mockXRays.map((xray) => (
-                <Card key={xray.id}>
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="font-semibold text-lg">{xray.name}</h3>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                          {new Date(xray.date).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Badge variant={getStatusBadge(xray.status)}>
-                        {xray.status}
-                      </Badge>
-                    </div>
-
-                    <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg mb-4">
-                      <p className="text-sm">
-                        <span className="font-semibold">Findings: </span>
-                        {xray.findings}
+            labTests.map((result) => (
+              <Card key={result.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-lg">{result.test_type === 'lab_test' ? result.body_part || 'Lab Test' : 'Test'}</h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {new Date(result.created_at).toLocaleDateString()}
                       </p>
                     </div>
+                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                      {result.status || 'completed'}
+                    </Badge>
+                  </div>
 
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 gap-2"
-                      >
-                        <Eye className="h-4 w-4" />
-                        View Image
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 gap-2"
-                      >
-                        <Download className="h-4 w-4" />
-                        Download
-                      </Button>
+                  {result.ai_analysis && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded mb-4">
+                      <p className="text-sm text-slate-700 dark:text-slate-300">
+                        <strong>Analysis:</strong> {result.ai_analysis}
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  )}
+
+                  {result.doctor_notes && (
+                    <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded mb-4">
+                      <p className="text-sm text-slate-700 dark:text-slate-300">
+                        <strong>Doctor's Notes:</strong> {result.doctor_notes}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    {result.image_url && (
+                      <>
+                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 gap-2">
+                          <Eye className="h-4 w-4" />
+                          View Image
+                        </Button>
+                        <Button size="sm" variant="outline" className="gap-2">
+                          <Download className="h-4 w-4" />
+                          Download
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
           )}
         </TabsContent>
 
-        {/* Documents */}
-        <TabsContent value="documents" className="space-y-4">
-          <EmptyState
-            title="No Documents"
-            description="Your medical documents will appear here"
-            icon={FileText}
-          />
+        {/* X-Rays */}
+        <TabsContent value="xrays" className="space-y-4">
+          {xrays.length === 0 ? (
+            <EmptyState
+              title="No X-Rays"
+              description="Your X-ray images will appear here"
+              icon={FileText}
+            />
+          ) : (
+            xrays.map((result) => (
+              <Card key={result.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-lg">{result.body_part} X-Ray</h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {new Date(result.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                      {result.status || 'completed'}
+                    </Badge>
+                  </div>
+
+                  {result.ai_analysis && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded mb-4">
+                      <p className="text-sm text-slate-700 dark:text-slate-300">
+                        <strong>AI Analysis:</strong> {result.ai_analysis}
+                      </p>
+                    </div>
+                  )}
+
+                  {result.doctor_notes && (
+                    <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded mb-4">
+                      <p className="text-sm text-slate-700 dark:text-slate-300">
+                        <strong>Doctor's Notes:</strong> {result.doctor_notes}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    {result.image_url && (
+                      <>
+                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 gap-2">
+                          <Eye className="h-4 w-4" />
+                          View X-Ray
+                        </Button>
+                        <Button size="sm" variant="outline" className="gap-2">
+                          <Download className="h-4 w-4" />
+                          Download
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </TabsContent>
+
+        {/* Scans */}
+        <TabsContent value="scans" className="space-y-4">
+          {scans.length === 0 ? (
+            <EmptyState
+              title="No Scans"
+              description="Your CT/MRI scans will appear here"
+              icon={FileText}
+            />
+          ) : (
+            scans.map((result) => (
+              <Card key={result.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-lg">{result.test_type.toUpperCase()} - {result.body_part}</h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {new Date(result.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                      {result.status || 'completed'}
+                    </Badge>
+                  </div>
+
+                  {result.ai_analysis && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded mb-4">
+                      <p className="text-sm text-slate-700 dark:text-slate-300">
+                        <strong>AI Analysis:</strong> {result.ai_analysis}
+                      </p>
+                    </div>
+                  )}
+
+                  {result.doctor_notes && (
+                    <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded mb-4">
+                      <p className="text-sm text-slate-700 dark:text-slate-300">
+                        <strong>Doctor's Notes:</strong> {result.doctor_notes}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    {result.image_url && (
+                      <>
+                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 gap-2">
+                          <Eye className="h-4 w-4" />
+                          View Image
+                        </Button>
+                        <Button size="sm" variant="outline" className="gap-2">
+                          <Download className="h-4 w-4" />
+                          Download
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </TabsContent>
       </Tabs>
     </div>

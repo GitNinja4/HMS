@@ -23,10 +23,11 @@ export default function HMSDashboard() {
     navigate(`/profile/${session?.user.id}`); // 👈 Redirect user after login
   }
 
-  // Fetch users for StatsCards calculation
+  // Fetch users for StatsCards calculation (admin only)
   const { data: userData, isLoading: isDataLoading } = useQuery({
     queryKey: ["patients"],
     queryFn: () => getUsers({ role: "patient", limit: 100 }),
+    enabled: user?.role === "admin", // Only fetch if admin
   });
 
   if (isAuthLoading || isDataLoading)
@@ -55,7 +56,7 @@ export default function HMSDashboard() {
       </div>
 
       {/* 2. Top Level Stats (The component we built earlier) */}
-      <StatsCards data={userData?.res || []} />
+      {isAdmin && <StatsCards data={userData?.res || []} />}
 
       {/* 3. Main Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

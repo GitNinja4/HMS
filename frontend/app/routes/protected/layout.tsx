@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { authClient } from "@/lib/auth-client";
+import { useLocalSession } from "@/hooks/useLocalSession";
 import type { Role } from "@/types";
 import Loader from "@/components/global/Loader";
 import { AppSidebar } from "@/components/navigation/app-sidebar";
@@ -10,7 +10,7 @@ import { getRouteConfig, navConfig } from "@/components/navigation/nav-config";
 import Header from "@/components/navigation/Header";
 
 const Layout = () => {
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, isPending } = useLocalSession();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const userRole = (session?.user?.role as Role) || "patient";

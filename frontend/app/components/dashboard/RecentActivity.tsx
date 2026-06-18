@@ -71,7 +71,7 @@ export function RecentActivity() {
       </p>
     );
 
-  const logs = data?.res || [];
+  const logs = data?.data || [];
 
   return (
     <div className="space-y-6 min-h-77">

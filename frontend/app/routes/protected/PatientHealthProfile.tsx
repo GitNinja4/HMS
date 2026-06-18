@@ -1,78 +1,40 @@
-import { Heart, AlertCircle, Edit2, Save, X } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Heart, AlertCircle, Edit2, TrendingDown, TrendingUp } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
-import { getMedicalHistoryByPatientId, getPatientById } from "@/lib/mockData";
+import * as api from "@/lib/api";
 import { SectionHeader } from "@/components/ui/section-header";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import Loader from "@/components/global/Loader";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export function meta() {
   return [{ title: "My Health Profile" }];
 }
 
 export default function PatientHealthProfile() {
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, isPending: isAuthLoading } = authClient.useSession();
   const user = session?.user;
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
 
-  // Get patient-specific medical history
-  const medicalHistory = useMemo(
-    () => getMedicalHistoryByPatientId(user?.id || ""),
-    [user?.id]
-  );
-
-  // Get patient details
-  const patientDetails = useMemo(
-    () => getPatientById(user?.id || ""),
-    [user?.id]
-  );
-
-  // Build mock health data from patient details and medical history
-  const mockHealthData = useMemo(
-    () => ({
-      bloodGroup: patientDetails?.bloodgroup || "N/A",
-      height: "5'10\"",
-      weight: "75 kg",
-      bmi: "24.5",
-      conditions: medicalHistory
-        .filter((h) => h.type === "condition")
-        .map((h) => h.title),
-      allergies: medicalHistory
-        .filter((h) => h.type === "allergy")
-        .map((h) => ({
-          name: h.title,
-          severity: (h.severity || "mild") as "mild" | "moderate" | "severe",
-          reaction: h.description,
-        })),
-      surgeries: medicalHistory
-        .filter((h) => h.type === "surgery")
-        .map((h) => ({
-          name: h.title,
-          date: h.date,
-          hospital: h.description,
-        })),
-      medications: medicalHistory
-        .filter((h) => h.type === "medication")
-        .map((h) => h.title),
-      emergencyContact: {
-        name: "Not Set",
-        relationship: "",
-        phone: "",
-      },
-    }),
-    [medicalHistory, patientDetails]
-  );
-
-  const [formData, setFormData] = useState({
-    height: mockHealthData.height,
-    weight: mockHealthData.weight,
+  // Fetch health profile
+  const { data: healthProfile, isLoading: healthProfileLoading } = useQuery({
+    queryKey: ["health-profile", user?.id],
+    queryFn: () => api.getPatientHealthProfile(user?.id || ""),
+    enabled: !!user?.id,
   });
 
-  if (isPending) {
+  // Fetch latest vital signs
+  const { data: vitalsData } = useQuery({
+    queryKey: ["vitals", user?.id],
+    queryFn: () =>
+      api.getPatientVitalSigns({
+        patientId: user?.id || "",
+        limit: 1,
+      }),
+    enabled: !!user?.id,
+  });
+
+  if (isAuthLoading || healthProfileLoading) {
     return (
       <div className="w-full h-screen flex items-center justify-center">
         <Loader label="Loading health profile..." />
@@ -80,246 +42,233 @@ export default function PatientHealthProfile() {
     );
   }
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      toast.success("Health profile updated!");
-      setIsEditingProfile(false);
-    } catch (error) {
-      toast.error("Failed to update profile");
-    } finally {
-      setIsSaving(false);
+  const profile = healthProfile || {};
+  const latestVitals = vitalsData?.data?.[0];
+
+  // Calculate BMI if weight and height available
+  const calculateBMI = () => {
+    if (latestVitals?.weight && latestVitals?.height) {
+      const heightInMeters = latestVitals.height / 100;
+      return (latestVitals.weight / (heightInMeters * heightInMeters)).toFixed(1);
     }
+    return null;
   };
 
-  const getSeverityColor = (
-    severity: string
-  ): "default" | "destructive" | "secondary" => {
-    if (severity === "severe") return "destructive";
-    if (severity === "moderate") return "secondary";
-    return "default";
+  const bmi = calculateBMI();
+
+  // Get BMI category
+  const getBMICategory = () => {
+    if (!bmi) return null;
+    const bmiValue = parseFloat(bmi);
+    if (bmiValue < 18.5) return { label: "Underweight", color: "bg-blue-100 text-blue-800" };
+    if (bmiValue < 25) return { label: "Normal", color: "bg-green-100 text-green-800" };
+    if (bmiValue < 30) return { label: "Overweight", color: "bg-yellow-100 text-yellow-800" };
+    return { label: "Obese", color: "bg-red-100 text-red-800" };
   };
+
+  const bmiCategory = getBMICategory();
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <SectionHeader
-          title="My Health Profile"
-          description="Manage your medical information and health records"
-          icon={Heart}
-        />
-        {!isEditingProfile && (
-          <Button
-            onClick={() => setIsEditingProfile(true)}
-            variant="outline"
-            className="gap-2"
-          >
-            <Edit2 className="h-4 w-4" />
-            Edit Profile
-          </Button>
-        )}
+      <SectionHeader
+        title="My Health Profile"
+        description="Manage your medical information and health conditions"
+        icon={Heart}
+      />
+
+      {/* Basic Health Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <Card className="card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Blood Group</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{profile.blood_group || "-"}</p>
+          </CardContent>
+        </Card>
+        <Card className="card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Height</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{latestVitals?.height || "-"} <span className="text-sm text-slate-500">cm</span></p>
+          </CardContent>
+        </Card>
+        <Card className="card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Weight</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{latestVitals?.weight || "-"} <span className="text-sm text-slate-500">kg</span></p>
+          </CardContent>
+        </Card>
+        <Card className="card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">BMI</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {bmi ? (
+              <div>
+                <p className="text-2xl font-bold">{bmi}</p>
+                {bmiCategory && (
+                  <Badge className={`mt-2 ${bmiCategory.color}`}>
+                    {bmiCategory.label}
+                  </Badge>
+                )}
+              </div>
+            ) : (
+              <p className="text-2xl font-bold">-</p>
+            )}
+          </CardContent>
+        </Card>
+        <Card className="card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Age</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{profile.age || "-"} <span className="text-sm text-slate-500">years</span></p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Personal Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">
-                Name
-              </p>
-              <p className="font-semibold">{user?.name}</p>
-            </div>
-            <div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">
-                Email
-              </p>
-              <p className="font-semibold">{user?.email}</p>
-            </div>
-            <div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">
-                Blood Group
-              </p>
-              <Badge>{mockHealthData.bloodGroup}</Badge>
-            </div>
-            <div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">
-                BMI
-              </p>
-              <p className="font-semibold">{mockHealthData.bmi}</p>
-            </div>
-          </div>
-
-          {isEditingProfile && (
-            <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-              <div>
-                <label className="text-sm font-semibold mb-2 block">
-                  Height
-                </label>
-                <input
-                  type="text"
-                  value={formData.height}
-                  onChange={(e) =>
-                    setFormData({ ...formData, height: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold mb-2 block">
-                  Weight (kg)
-                </label>
-                <input
-                  type="text"
-                  value={formData.weight}
-                  onChange={(e) =>
-                    setFormData({ ...formData, weight: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Allergies - High Priority */}
-      <Card className="border-2 border-red-200 dark:border-red-900">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
-            <CardTitle>Known Allergies</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {mockHealthData.allergies.length === 0 ? (
-            <p className="text-slate-500 dark:text-slate-400">No allergies recorded</p>
-          ) : (
-            mockHealthData.allergies.map((allergy, idx) => (
-              <div
-                key={idx}
-                className="flex items-start justify-between p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-100 dark:border-red-900/50"
-              >
-                <div>
-                  <p className="font-semibold">{allergy.name}</p>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Reaction: {allergy.reaction}
+      {/* Latest Vital Signs */}
+      {latestVitals && (
+        <Card className="card">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-blue-500" />
+              Latest Vital Signs
+            </CardTitle>
+            <span className="text-xs text-slate-500">
+              Recorded: {new Date(latestVitals.recorded_at).toLocaleDateString()}
+            </span>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {latestVitals.blood_pressure_systolic && (
+                <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Blood Pressure</p>
+                  <p className="text-lg font-semibold">
+                    {latestVitals.blood_pressure_systolic}/{latestVitals.blood_pressure_diastolic} mmHg
                   </p>
                 </div>
-                <Badge variant={getSeverityColor(allergy.severity)}>
-                  {allergy.severity}
-                </Badge>
+              )}
+              {latestVitals.heart_rate && (
+                <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Heart Rate</p>
+                  <p className="text-lg font-semibold">{latestVitals.heart_rate} BPM</p>
+                </div>
+              )}
+              {latestVitals.temperature && (
+                <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Temperature</p>
+                  <p className="text-lg font-semibold">{latestVitals.temperature}°C</p>
+                </div>
+              )}
+              {latestVitals.oxygen_saturation && (
+                <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">O₂ Saturation</p>
+                  <p className="text-lg font-semibold">{latestVitals.oxygen_saturation}%</p>
+                </div>
+              )}
+              {latestVitals.respiratory_rate && (
+                <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Respiratory Rate</p>
+                  <p className="text-lg font-semibold">{latestVitals.respiratory_rate}/min</p>
+                </div>
+              )}
+            </div>
+            {latestVitals.notes && (
+              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded">
+                <p className="text-sm text-slate-700 dark:text-slate-300">
+                  <strong>Notes:</strong> {latestVitals.notes}
+                </p>
               </div>
-            ))
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Medical Conditions */}
+      <Card className="card">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle>Medical Conditions</CardTitle>
+          <Button size="sm" variant="ghost" className="gap-2">
+            <Edit2 className="h-4 w-4" />
+            Edit
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {profile.medical_history ? (
+            <div className="space-y-2">
+              <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                {profile.medical_history}
+              </p>
+            </div>
+          ) : (
+            <p className="text-slate-500 dark:text-slate-400">No medical conditions recorded</p>
           )}
         </CardContent>
       </Card>
 
-      {/* Medical Conditions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Medical Conditions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {mockHealthData.conditions.map((condition, idx) => (
-              <Badge key={idx} variant="secondary" className="text-sm">
-                {condition}
-              </Badge>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Current Medications */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Current Medications</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2">
-            {mockHealthData.medications.map((med, idx) => (
-              <li key={idx} className="flex items-center gap-2">
-                <div className="h-2 w-2 bg-blue-600 rounded-full" />
-                {med}
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-
-      {/* Surgical History */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Surgical History</CardTitle>
+      {/* Personal Information */}
+      <Card className="card">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle>Personal Information</CardTitle>
+          <Button size="sm" variant="ghost" className="gap-2">
+            <Edit2 className="h-4 w-4" />
+            Edit
+          </Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          {mockHealthData.surgeries.map((surgery, idx) => (
-            <div
-              key={idx}
-              className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg"
-            >
-              <p className="font-semibold">{surgery.name}</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                {new Date(surgery.date).toLocaleDateString()}
-              </p>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                {surgery.hospital}
-              </p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Name</p>
+              <p className="font-semibold">{profile.name || "-"}</p>
             </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* Emergency Contact */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Emergency Contact</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <p className="text-sm">
-              <span className="font-semibold">Name: </span>
-              {mockHealthData.emergencyContact.name}
-            </p>
-            <p className="text-sm">
-              <span className="font-semibold">Relationship: </span>
-              {mockHealthData.emergencyContact.relationship}
-            </p>
-            <p className="text-sm">
-              <span className="font-semibold">Phone: </span>
-              {mockHealthData.emergencyContact.phone}
-            </p>
+            <div>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Gender</p>
+              <p className="font-semibold capitalize">{profile.gender || "-"}</p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Status</p>
+              <Badge className="capitalize">
+                {profile.status || "active"}
+              </Badge>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Edit Actions */}
-      {isEditingProfile && (
-        <div className="flex gap-2 sticky bottom-4">
-          <Button
-            variant="outline"
-            onClick={() => setIsEditingProfile(false)}
-            className="flex-1 gap-2"
-          >
-            <X className="h-4 w-4" />
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="flex-1 gap-2 bg-blue-600 hover:bg-blue-700"
-          >
-            <Save className="h-4 w-4" />
-            {isSaving ? "Saving..." : "Save Changes"}
-          </Button>
-        </div>
-      )}
+      {/* Assigned Healthcare Providers */}
+      <Card className="card">
+        <CardHeader>
+          <CardTitle>Healthcare Team</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {profile.assigned_doctor_id ? (
+            <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded">
+              <div>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Assigned Doctor</p>
+                <p className="font-semibold">Doctor ID: {profile.assigned_doctor_id}</p>
+              </div>
+              <Button size="sm" variant="outline">Contact</Button>
+            </div>
+          ) : (
+            <p className="text-slate-500 dark:text-slate-400">No doctor assigned</p>
+          )}
+
+          {profile.assigned_nurse_id && (
+            <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded">
+              <div>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Assigned Nurse</p>
+                <p className="font-semibold">Nurse ID: {profile.assigned_nurse_id}</p>
+              </div>
+              <Button size="sm" variant="outline">Contact</Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
